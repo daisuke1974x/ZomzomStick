@@ -1,6 +1,7 @@
 //===================================================================
 // ZomzomStick   by tech.Daisuke
 //   Ver1.0  2021.01.28
+//   Ver1.1  2021.02.09  [無印]への対応、バッテリー残量表示機能追加。
 //===================================================================
 
 //参考にしたサイト
@@ -13,10 +14,10 @@
 
 
 //  M5StickC の無印,Plusの種類に応じてコメントアウトしてください。
-//#include <M5StickC.h>
-//int M5StickSystem = 0;// 0:M5Stick  1:M5StickC Plus
-#include <M5StickCPlus.h>
-int M5StickSystem = 1;// 0:M5Stick  1:M5StickC Plus
+#include <M5StickC.h>
+int M5StickSystem = 0;// 0:M5Stick  1:M5StickC Plus
+//#include <M5StickCPlus.h>
+//int M5StickSystem = 1;// 0:M5Stick  1:M5StickC Plus
 
 #include <BLEDevice.h>
 #include <BLEUtils.h>
@@ -40,6 +41,9 @@ bool flag_BtnB = false;     //[B]ボタンの長押し検知兼リピート防�
 int flag_os = 0;            //起動時のOS選択　 0:Windows  1:mac  ※[B]ボタン長押しで切り替えできます。
 bool flag_pairing = false;  // ペアリングが完了しているかどうか
 
+double vbat = 0.0;
+int8_t bat_charge_p = 0;
+
 //-------------------------------------------------------------------
 // 画面表示
 //-------------------------------------------------------------------
@@ -53,6 +57,17 @@ void indicate(){
   //M5Stick無印の表示範囲の確認用（デバッグ）
   //M5.Lcd.fillRect(0,0,160,80,YELLOW);
 
+  // バッテリー残量取得
+  //https://tofu-so.hatenablog.jp/entry/2019/09/07/090000
+  // 簡易的に、線形で4.2Vで100%、3.0Vで0%とする
+  vbat = M5.Axp.GetVbatData() * 1.1 / 1000;
+  bat_charge_p = int8_t((vbat - 3.0) / 1.2 * 100);
+  if(bat_charge_p > 100){
+    bat_charge_p = 100;
+  }else if(bat_charge_p < 0){
+    bat_charge_p = 0;
+  }
+    
   //------------------------
   // M5Stick 無印 のとき
   //------------------------
@@ -66,7 +81,7 @@ void indicate(){
     M5.Lcd.setCursor(0, 0);
     M5.Lcd.setTextSize(2);
     M5.Lcd.setTextColor(WHITE,BLACK); 
-    M5.Lcd.println("[Zomzom Stick]");
+    M5.Lcd.println("[ZomzomStick]");
     M5.Lcd.println("Connected");
 
     //対象システムとアプリアイコン
@@ -94,6 +109,10 @@ void indicate(){
     } else {
       M5.Lcd.pushImage(80, 48, imgWidth, imgHeight, img_video_mute_32);
     }
+
+    // バッテリー残量表示
+    M5.Lcd.setCursor(112, 32);
+    M5.Lcd.printf("%3d%%", bat_charge_p);
   }
 
   //------------------------
@@ -137,6 +156,10 @@ void indicate(){
     } else {
       M5.Lcd.pushImage(160, 48, imgWidth, imgHeight, img_video_mute_64);
     }
+
+    // バッテリー残量表示
+    M5.Lcd.setCursor(180, 32);
+    M5.Lcd.printf("%3d%%", bat_charge_p);
   
     //使い方説明
     M5.Lcd.setTextSize(1);
@@ -355,13 +378,26 @@ void setup() {
   M5.begin();
   M5.IMU.Init();
 
-  M5.Axp.ScreenBreath(9);
+  M5.Axp.ScreenBreath(9);//画面の明るさ（0～12で、7以下だと暗すぎて見えない）
   M5.Lcd.setRotation(1);// 画面に対して[A]ボタンが・・・1:右側、3:左側
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextSize(2);
 
+  // CPU周波数設定。
+  //https://make-muda.net/2019/09/6946/
+  // デフォルトは240MHzで、240, 160, 80, 40, 20, 10から選択可
+  //10だとペアリングができなかった。
+  while(!setCpuFrequencyMhz(80)){
+    ;
+  }
+  
   //M5.Lcd.println("[M5StickC]");
-  M5.Lcd.println("[ Zomzom Stick ]");
+  if (M5StickSystem == 0){
+    M5.Lcd.println("[ZomzomStick]");
+  }
+  if (M5StickSystem == 1){
+    M5.Lcd.println(" [ Zomzom Stick ]");
+  }
   delay(1000);
   //M5.Lcd.println("start Serial");
 
